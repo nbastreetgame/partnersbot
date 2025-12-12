@@ -168,7 +168,7 @@ def main() -> None:
     """Запуск бота"""
     
     # Токен бота
-    TOKEN = "8544544839:AAFe5kbQoqR3dJXejS30n4jW9liYHcTws-A"
+    TOKEN = "8348162905:AAFdIbpbx2r4jwrGYvSl-pE9C-Rv1WgSSJ0"
     
     # Создаем приложение
     application = Application.builder().token(TOKEN).build()
