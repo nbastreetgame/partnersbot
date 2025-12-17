@@ -75,7 +75,7 @@ async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "Стоимость: 3 000.00 🇷🇺RUB\n"
         "Срок действия: Навсегда ♾️\n\n"
         "Вы получите доступ к:\n"
-        "• 💋 NataFullPorn (канал)"
+        "• 🥰Я И МОИ ПАРТНЕРЫ🥰🤩💦 (канал)"
     )
     
     await update.message.reply_text(response, reply_markup=reply_markup)
