@@ -1,6 +1,6 @@
 import logging
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
 # Настройка логирования
 logging.basicConfig(
@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 # ID администратора
 ADMIN_ID = 7014721682
+
+# ID канала
+CHANNEL_ID = -1003451355457
 
 # Множество для хранения ID пользователей
 registered_users = set()
@@ -135,6 +138,15 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = update.effective_user
     photo = update.message.photo[-1]
     
+    # Создаем инлайн-кнопки для админа
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Одобрить", callback_data=f"approve_{user.id}"),
+            InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_{user.id}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     try:
         await context.bot.send_photo(
             chat_id=ADMIN_ID,
@@ -142,8 +154,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             caption=f"💳 Новый чек об оплате:\n\n"
                     f"👤 Пользователь: {user.first_name} {user.last_name or ''}\n"
                     f"Username: @{user.username or 'нет'}\n"
-                    f"ID: {user.id}\n"
-                    f"Тариф: НАВСЕГДА (3000₽)"
+                    f"ID: `{user.id}`\n"
+                    f"Тариф: НАВСЕГДА (3000₽)",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
         )
         
         await update.message.reply_text(
@@ -158,6 +172,66 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(
             "❌ Произошла ошибка. Попробуйте позже или свяжитесь с администратором."
         )
+
+# Обработчик callback кнопок (Одобрить/Отклонить)
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает нажатия на инлайн-кнопки"""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data.split('_')
+    action = data[0]
+    user_id = int(data[1])
+    
+    if action == "approve":
+        try:
+            # Создаем invite link для пользователя
+            invite_link = await context.bot.create_chat_invite_link(
+                chat_id=CHANNEL_ID,
+                member_limit=1
+            )
+            
+            # Отправляем ссылку пользователю
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=f"🎉 Ваша оплата подтверждена!\n\n"
+                     f"Тариф: НАВСЕГДА ♾️\n"
+                     f"Ссылка на канал: {invite_link.invite_link}\n\n"
+                     f"⚠️ Ссылка одноразовая, используйте её для входа в канал."
+            )
+            
+            # Обновляем сообщение админа
+            await query.edit_message_caption(
+                caption=query.message.caption + "\n\n✅ ОДОБРЕНО",
+                reply_markup=None
+            )
+            
+            await context.bot.send_message(
+                chat_id=ADMIN_ID,
+                text=f"✅ Пользователь {user_id} получил доступ НАВСЕГДА к каналу NataFullPorn"
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка одобрения: {e}")
+            await query.edit_message_caption(
+                caption=query.message.caption + f"\n\n❌ Ошибка: {e}",
+                reply_markup=None
+            )
+    
+    elif action == "reject":
+        try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="❌ К сожалению, ваша оплата не подтверждена.\n"
+                     "Пожалуйста, свяжитесь с администратором."
+            )
+            
+            await query.edit_message_caption(
+                caption=query.message.caption + "\n\n❌ ОТКЛОНЕНО",
+                reply_markup=None
+            )
+        except Exception as e:
+            logger.error(f"Ошибка отклонения: {e}")
 
 # Обработчик кнопки "НАЗАД" и "ОТМЕНА"
 async def handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -196,6 +270,9 @@ def main() -> None:
     
     # Обработчик фото
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    
+    # Обработчик callback кнопок
+    application.add_handler(CallbackQueryHandler(handle_callback))
     
     # Запускаем бота
     logger.info("Бот запущен...")
